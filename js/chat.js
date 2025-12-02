@@ -1,11 +1,14 @@
 // Nutri Chat Interface
 
-// Configuration for Netlify deployment:
-// 1. Run the backend locally with ngrok: `ngrok http 8000`
-// 2. Paste it below as the value for NGROK_URL
+// Configuration for GitHub Pages deployment:
+// 1. Run the backend locally: .\start.bat
+// 2. Check the Ngrok window for your public URL (https://....ngrok-free.app)
+// 3. Paste it below as NGROK_URL (replace the existing URL)
+// 4. Push to GitHub Pages
 const NGROK_URL = "https://optatively-dreich-scot.ngrok-free.dev"; 
 
-const API_BASE = (NGROK_URL ? NGROK_URL.replace(/\/$/, '') : '') || (window.location.hostname === 'localhost' ? 'http://localhost:8000' : '');
+// API Base - uses NGROK_URL for production, localhost for local dev
+const API_BASE = NGROK_URL ? NGROK_URL.replace(/\/$/, '') : 'http://localhost:8000';
 let chatHistory = [];
 
 // Session management
@@ -120,7 +123,8 @@ async function sendMessage() {
                     localStorage.setItem('nutri_session_id', sessionId);
                 }
             } else {
-                appendMessage('assistant', `I couldn't generate a recipe. ${data.error || data.refusal_message}`);
+                const errorMsg = data.error || data.refusal_message || 'Unknown error - check console';
+                appendMessage('assistant', `I couldn't generate a recipe. ${errorMsg}`);
             }
         }
         
@@ -129,8 +133,8 @@ async function sendMessage() {
         
     } catch (e) {
         removeMessage(loadingId);
-        appendMessage('assistant', `Sorry, something went wrong. (${e.message})`);
-        console.error(e);
+        console.error('API Error:', e);
+        appendMessage('assistant', `❌ **Connection Error**\n\nCouldn't reach the backend. Make sure:\n1. Backend is running (\`start.bat\`)\n2. Ngrok URL in chat.js is current\n3. Check browser console (F12)\n\nError: ${e.message}`);
     }
 }
 
@@ -138,6 +142,12 @@ function appendMessage(role, text, sources = null) {
     const chatDiv = document.getElementById('chatMessages');
     const msgDiv = document.createElement('div');
     msgDiv.className = `message ${role}`;
+    
+    // Validate text input to prevent marked.js errors
+    if (!text || text === null || text === undefined) {
+        text = 'No response received';
+    }
+    text = String(text); // Ensure it's a string
     
     const icon = role === 'user' ? 'fa-user' : 'fa-robot';
     
