@@ -335,3 +335,11 @@ async function sendChatMessage() {
         appendMessage('assistant', `Network error: ${error.message}. Make sure the server is running.`);
     }
 }
+
+// Accordion toggle for mobile
+function toggleAccordion(accordionId) {
+    const accordion = document.getElementById(accordionId);
+    if (accordion) {
+        accordion.classList.toggle('open');
+    }
+}

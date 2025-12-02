@@ -70,31 +70,45 @@
                         <textarea id="userInput" placeholder="What ingredients do you have? (e.g., chicken, rice, garlic)" rows="2" oninput="autoResize(this)"></textarea>
                     </div>
 
-                    <!-- Additional Fields Row -->
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="dislikes">Dislikes/Allergies</label>
-                            <input type="text" id="dislikes" placeholder="e.g., mushrooms, nuts (or 'none')">
+                    <!-- Collapsible Additional Options -->
+                    <div class="accordion" id="optionsAccordion">
+                        <div class="accordion-header" onclick="toggleAccordion('optionsAccordion')">
+                            <h3>
+                                <i class="fa-solid fa-sliders"></i>
+                                Additional Options
+                            </h3>
+                            <i class="fa-solid fa-chevron-down accordion-icon"></i>
                         </div>
+                        <div class="accordion-content">
+                            <div class="accordion-body">
+                                <!-- Additional Fields Row -->
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="dislikes">Dislikes/Allergies</label>
+                                        <input type="text" id="dislikes" placeholder="e.g., mushrooms, nuts (or 'none')">
+                                    </div>
 
-                        <div class="form-group">
-                            <label for="dietaryConstraints">Dietary Constraints</label>
-                            <input type="text" id="dietaryConstraints" placeholder="e.g., vegan, gluten-free (or 'none')">
-                        </div>
-                    </div>
+                                    <div class="form-group">
+                                        <label for="dietaryConstraints">Dietary Constraints</label>
+                                        <input type="text" id="dietaryConstraints" placeholder="e.g., vegan, gluten-free (or 'none')">
+                                    </div>
+                                </div>
 
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="goal">Goal</label>
-                            <input type="text" id="goal" placeholder="e.g., dinner, breakfast, snack">
-                        </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="goal">Goal</label>
+                                        <input type="text" id="goal" placeholder="e.g., dinner, breakfast, snack">
+                                    </div>
 
-                        <div class="form-group">
-                            <label for="innovationLevel">Creativity Level: <span id="innovationValue">1</span></label>
-                            <input type="range" id="innovationLevel" min="1" max="5" value="1" oninput="document.getElementById('innovationValue').textContent = this.value">
-                            <div class="range-labels">
-                                <span>Safe</span>
-                                <span>Experimental</span>
+                                    <div class="form-group">
+                                        <label for="innovationLevel">Creativity Level: <span id="innovationValue">1</span></label>
+                                        <input type="range" id="innovationLevel" min="1" max="5" value="1" oninput="document.getElementById('innovationValue').textContent = this.value">
+                                        <div class="range-labels">
+                                            <span>Safe</span>
+                                            <span>Experimental</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
