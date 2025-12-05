@@ -8,7 +8,13 @@
 const NGROK_URL = "https://optatively-dreich-scot.ngrok-free.dev"; 
 
 // API Base - uses NGROK_URL for production, localhost for local dev
-const API_BASE = NGROK_URL ? NGROK_URL.replace(/\/$/, '') : 'http://localhost:8000';
+// Fallback to localhost if NGROK_URL is the default placeholder or empty
+const API_BASE = (NGROK_URL && !NGROK_URL.includes('optatively')) 
+    ? NGROK_URL.replace(/\/$/, '') 
+    : 'http://localhost:8000';
+
+console.log('API Base URL:', API_BASE);
+
 let chatHistory = [];
 
 // Session management
@@ -30,12 +36,25 @@ document.addEventListener('DOMContentLoaded', () => {
     loadHistory();
     
     // Enter key to send
-    document.getElementById('userInput').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    });
+    const userInput = document.getElementById('userInput');
+    if (userInput) {
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    }
+
+    const chatInput = document.getElementById('chatInput');
+    if (chatInput) {
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendChatMessage();
+            }
+        });
+    }
 });
 
 // Auto-resize textarea (elastic 1-4 lines)
@@ -48,18 +67,93 @@ function autoResize(textarea) {
     textarea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+// Unified function to call the API
+async function callApi(payload) {
+    try {
+        console.log('Sending request to:', `${API_BASE}/chat`);
+        console.log('Payload:', payload);
+
+        const response = await fetch(`${API_BASE}/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Server error (${response.status}): ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log('Received response:', data);
+        return data;
+    } catch (error) {
+        console.error('API Call Failed:', error);
+        throw error;
+    }
+}
+
 async function sendMessage() {
     const input = document.getElementById('userInput');
     const text = input.value.trim();
-    const useHybrid = document.getElementById('hybridToggle').checked;
     
     if (!text) return;
     
     // Extract all form field values
-    const dislikes = document.getElementById('dislikes')?.value.trim() || 'none';
-    const dietaryConstraints = document.getElementById('dietaryConstraints')?.value.trim() || 'none';
+    const dislikes = document.getElementById('dislikes')?.value.trim() || '';
+    const dietaryConstraints = document.getElementById('dietaryConstraints')?.value.trim() || '';
     const goal = document.getElementById('goal')?.value.trim() || 'meal';
     const innovationLevel = parseInt(document.getElementById('innovationLevel')?.value || '1');
+    
+    // Clear input
+    input.value = '';
+    input.style.height = 'auto';
+    
+    // Add user message
+    appendMessage('user', `**Ingredients:** ${text}\n**Goal:** ${goal}`);
+    
+    // Show loading
+    const loadingId = showLoading();
+    
+    try {
+        // Construct message for the LLM
+        const userMessage = `Create a ${goal} recipe using these ingredients: ${text}.`;
+        
+        const payload = {
+            session_id: sessionId,
+            message: userMessage,
+            ingredients: text,
+            dislikes: dislikes,
+            dietary_constraints: dietaryConstraints,
+            goal: goal,
+            innovation_level: innovationLevel
+        };
+
+        const data = await callApi(payload);
+        removeMessage(loadingId);
+        
+        // Handle response
+        if (data && data.answer) {
+            appendMessage('assistant', data.answer, data.sources || data.facts_used);
+            if (data.session_id) {
+                sessionId = data.session_id;
+                localStorage.setItem('nutri_session_id', sessionId);
+            }
+        } else {
+            appendMessage('assistant', 'Received empty response from server.');
+        }
+
+    } catch (e) {
+        removeMessage(loadingId);
+        appendMessage('assistant', `❌ **Connection Error**\n\n${e.message}\n\nCheck console (F12) for details.`);
+    }
+}
+
+async function sendChatMessage() {
+    const input = document.getElementById('chatInput');
+    const text = input.value.trim();
+    
+    if (!text) return;
     
     // Clear input
     input.value = '';
@@ -72,44 +166,32 @@ async function sendMessage() {
     const loadingId = showLoading();
     
     try {
-        let response;
-        let data;
-        
-        // Determine mode: Search vs Recipe Generation
-        if (text.toLowerCase().startsWith('search:')) {
-            // Search Mode
-            const query = text.substring(7).trim();
-            response = await fetch(`${API_BASE}/api/hybrid_search`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query: query, k: 5, use_hybrid: useHybrid })
-            });
-            
-            data = await response.json();
-            removeMessage(loadingId);
-            
-            if (data.success) {
-                const answer = `Here are the top results for "${query}":`;
-                appendMessage('assistant', answer, data.recipes);
-            } else {
-                appendMessage('assistant', `Error: ${data.error}`);
-            }
-            
-        } else {
-            // Recipe Generation Mode - Include all fields
-            response = await fetch(`${API_BASE}/api/recipe`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ingredients: text,
-                    dislikes: dislikes,
-                    dietary_constraints: dietaryConstraints,
-                    goal: goal,
-        
-    } catch (e) {
+        const payload = {
+            session_id: sessionId,
+            message: text,
+            // Pass empty constraints for general chat, or grab them if you want persistent preferences
+            ingredients: "",
+            dislikes: "", 
+            dietary_constraints: "",
+            goal: "chat",
+            innovation_level: 1
+        };
+
+        const data = await callApi(payload);
         removeMessage(loadingId);
-        console.error('API Error:', e);
-        appendMessage('assistant', `❌ **Connection Error**\n\nCouldn't reach the backend. Make sure:\n1. Backend is running (\`start.bat\`)\n2. Ngrok URL in chat.js is current\n3. Check browser console (F12)\n\nError: ${e.message}`);
+        
+        if (data && data.answer) {
+            appendMessage('assistant', data.answer, data.sources || data.facts_used);
+            if (data.session_id) {
+                sessionId = data.session_id;
+                localStorage.setItem('nutri_session_id', sessionId);
+            }
+        } else {
+            appendMessage('assistant', 'Received empty response from server.');
+        }
+    } catch (error) {
+        removeMessage(loadingId);
+        appendMessage('assistant', `❌ **Connection Error**\n\n${error.message}`);
     }
 }
 
@@ -138,18 +220,29 @@ function appendMessage(role, text, sources = null) {
             <div class="sources-title"><i class="fa-solid fa-book-open"></i> Sources Used</div>`;
             
         sources.forEach((src, idx) => {
-            const score = src.confidence || src.score || 0;
+            // Handle different source formats (RAG vs Branded)
+            let title = src.title || src.brand_name || 'Unknown Source';
+            let snippet = src.snippet || src.directions || src.ingredients || '';
+            let score = src.score || src.confidence || 0;
+            
+            // If it's a branded food result
+            if (src.type === 'branded' || src.brand_name) {
+                title = `${src.brand_name} (${src.brand_owner || 'Unknown'})`;
+                snippet = src.ingredients || '';
+                score = 1.0; // Assume high confidence for direct database hits
+            }
+            
             const percentage = (score * 100).toFixed(0);
-            let snippet = src.snippet;
-            if (!snippet && src.text) {
-                snippet = src.text.substring(0, 150) + '...';
+            
+            if (typeof snippet === 'string' && snippet.length > 150) {
+                snippet = snippet.substring(0, 150) + '...';
             }
             if (!snippet) snippet = 'No preview available';
             
             html += `
                 <div class="source-card">
                     <div class="source-header">
-                        <span class="source-title">#${idx + 1} ${src.title || 'Unknown Source'}</span>
+                        <span class="source-title">#${idx + 1} ${title}</span>
                         <span class="source-score">${percentage}% match</span>
                     </div>
                     <div class="source-snippet">"${snippet}"</div>
@@ -168,12 +261,6 @@ function appendMessage(role, text, sources = null) {
     
     chatDiv.appendChild(msgDiv);
     scrollToBottom();
-    
-    // Simulate streaming effect for assistant
-    if (role === 'assistant' && !sources) {
-        // Simple fade in is handled by CSS, but we could do character-by-character here if requested.
-        // For now, the CSS fade-in is "smooth" enough for the prompt requirements.
-    }
 }
 
 function showLoading() {
@@ -226,6 +313,13 @@ async function clearMemory() {
         sessionId = generateUUID();
         localStorage.setItem('nutri_session_id', sessionId);
         console.log('Conversation memory cleared, new session:', sessionId);
+        
+        // Notify backend
+        await fetch(`${API_BASE}/session/clear`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId })
+        });
     } catch (e) {
         console.error('Failed to clear memory:', e);
     }
@@ -265,49 +359,20 @@ function switchMode(mode) {
     }
 }
 
-// Chat message handler
-async function sendChatMessage() {
-    const input = document.getElementById('chatInput');
-    const text = input.value.trim();
-    
-    if (!text) return;
-    
-    // Clear input
-    input.value = '';
-    input.style.height = 'auto';
-    
-    // Add user message
-    appendMessage('user', text);
-    
-    // Show loading
-    const loadingId = showLoading();
-    
-    try {
-        const response = await fetch(`${API_BASE}/api/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                message: text,
-                session_id: sessionId
-            })
-        });
-        
-        const data = await response.json();
-        removeMessage(loadingId);
-        
-        if (data.success) {
-            appendMessage('assistant', data.reply);
-            // Update session ID if server provided a new one
-            if (data.session_id) {
-                sessionId = data.session_id;
-                localStorage.setItem('nutri_session_id', sessionId);
-            }
-        } else {
-            appendMessage('assistant', `Error: ${data.error || 'Failed to get response'}`);
-        }
-    } catch (error) {
-        removeMessage(loadingId);
-        appendMessage('assistant', `Network error: ${error.message}. Make sure the server is running.`);
+// Helper to set input from suggestions
+function setInput(text) {
+    if (text.startsWith('search:')) {
+        // Switch to chat mode for search
+        switchMode('chat');
+        const chatInput = document.getElementById('chatInput');
+        chatInput.value = text.substring(7).trim(); // Remove 'search:' prefix
+        sendChatMessage();
+    } else {
+        // Determine if it's a recipe request or chat
+        // For simplicity, use recipe mode for ingredient lists
+        switchMode('recipe');
+        const userInput = document.getElementById('userInput');
+        userInput.value = text;
     }
 }
 
