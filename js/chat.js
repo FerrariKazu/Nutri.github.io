@@ -38,16 +38,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+// Auto-resize textarea (elastic 1-4 lines)
 function autoResize(textarea) {
     textarea.style.height = 'auto';
-    textarea.style.height = textarea.scrollHeight + 'px';
-}
-
-function setInput(text) {
-    const input = document.getElementById('userInput');
-    input.value = text;
-    input.focus();
-    autoResize(input);
+    const newHeight = Math.min(Math.max(textarea.scrollHeight, 48), 120);
+    textarea.style.height = newHeight + 'px';
+    
+    // Auto-scroll to keep textarea in view
+    textarea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 async function sendMessage() {
@@ -107,29 +105,6 @@ async function sendMessage() {
                     dislikes: dislikes,
                     dietary_constraints: dietaryConstraints,
                     goal: goal,
-                    innovation_level: innovationLevel,
-                    session_id: sessionId  // Include session ID
-                })
-            });
-            
-            data = await response.json();
-            removeMessage(loadingId);
-            
-            if (data.success) {
-                appendMessage('assistant', data.reply, data.retrieved_recipes);
-                // Update session ID if server provided a new one
-                if (data.session_id) {
-                    sessionId = data.session_id;
-                    localStorage.setItem('nutri_session_id', sessionId);
-                }
-            } else {
-                const errorMsg = data.error || data.refusal_message || 'Unknown error - check console';
-                appendMessage('assistant', `I couldn't generate a recipe. ${errorMsg}`);
-            }
-        }
-        
-        // Save to history (local storage for now)
-        saveToHistory(text);
         
     } catch (e) {
         removeMessage(loadingId);
