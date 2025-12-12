@@ -7,7 +7,7 @@
 // 4. Push to GitHub Pages
 // 3. Paste it below as NGROK_URL (replace the existing URL)
 // 4. Push to GitHub Pages
-const NGROK_URL = "https://d688d8b9ce1bcf.lhr.life";
+const NGROK_URL = "https://f3745fccfe3e1c.lhr.life";
 
 // API Base - uses NGROK_URL if set, otherwise localhost
 const API_BASE = NGROK_URL;
